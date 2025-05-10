@@ -1,34 +1,36 @@
 <template>
-  <div id="app">
-    <nav>
-      <RouterLink to="/">Home</RouterLink>
-      <RouterLink to="/qr-code">QR Code</RouterLink>
-      <RouterLink to="/json-formatter">JSON Formatter</RouterLink>
-      <RouterLink to="/text-case">Text Case</RouterLink>
-      <RouterLink to="/markdown">Markdown</RouterLink>
-      <RouterLink to="/image-base64">Image to Base64</RouterLink>
-    </nav>
-    <RouterView />
-  </div>
+  <DefaultLayout>
+    <router-view v-slot="{ Component }">
+      <transition name="fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
+  </DefaultLayout>
 </template>
 
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
+import { provide } from 'vue'
+import { useLocalStorage } from './composables/useLocalStorage'
+import DefaultLayout from './layouts/DefaultLayout.vue'
+
+// Gestion du thème
+const { value: isDarkMode } = useLocalStorage('darkMode', 
+  window.matchMedia('(prefers-color-scheme: dark)').matches)
+
+provide('isDarkMode', isDarkMode)
 </script>
 
 <style>
-nav {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background-color: #42b983;
-  flex-wrap: wrap;
+@import './assets/styles/variables.css';
+@import './assets/styles/main.css';
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
 }
-a {
-  color: white;
-  text-decoration: none;
-}
-a.router-link-exact-active {
-  font-weight: bold;
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
