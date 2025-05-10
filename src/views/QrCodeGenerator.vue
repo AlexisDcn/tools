@@ -40,13 +40,11 @@ export default {
   text-align: center;
   padding: 20px;
 }
-
 input {
   padding: 10px;
   width: 60%;
   margin: 10px 0;
 }
-
 button {
   padding: 10px 20px;
   background-color: #42b983;
@@ -54,11 +52,9 @@ button {
   border: none;
   cursor: pointer;
 }
-
 button:hover {
   background-color: #369c75;
 }
-
 img {
   margin-top: 20px;
   max-width: 200px;

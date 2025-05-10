@@ -32,14 +32,12 @@ export default {
   text-align: center;
   padding: 20px;
 }
-
 textarea {
   width: 80%;
   padding: 10px;
   font-family: monospace;
   margin-top: 10px;
 }
-
 button {
   padding: 10px 20px;
   margin-top: 10px;
@@ -48,11 +46,9 @@ button {
   border: none;
   cursor: pointer;
 }
-
 button:hover {
   background-color: #369c75;
 }
-
 pre {
   text-align: left;
   margin-top: 20px;
@@ -62,5 +58,7 @@ pre {
   padding: 10px;
   border-radius: 8px;
   width: 80%;
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>

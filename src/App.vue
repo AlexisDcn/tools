@@ -1,59 +1,34 @@
 <template>
-  <div class="home">
-    <h1>Welcome to My Tools Collection</h1>
-    <p>Here are some handy tools to make life easier.</p>
-    <div class="tools-list">
-      <div class="tool-card">
-        <h2>QR Code Generator</h2>
-        <QrCodeGenerator />
-      </div>
-      <div class="tool-card">
-        <h2>JSON Formatter</h2>
-        <JsonFormatter />
-      </div>
-    </div>
+  <div id="app">
+    <nav>
+      <RouterLink to="/">Home</RouterLink>
+      <RouterLink to="/qr-code">QR Code</RouterLink>
+      <RouterLink to="/json-formatter">JSON Formatter</RouterLink>
+      <RouterLink to="/text-case">Text Case</RouterLink>
+      <RouterLink to="/markdown">Markdown</RouterLink>
+      <RouterLink to="/image-base64">Image to Base64</RouterLink>
+    </nav>
+    <RouterView />
   </div>
 </template>
 
-<script>
-import QrCodeGenerator from './components/QrCodeGenerator.vue';
-import JsonFormatter from './components/JsonFormatter.vue';
-
-export default {
-  components: {
-    QrCodeGenerator,
-    JsonFormatter,
-  },
-};
+<script setup>
+import { RouterLink, RouterView } from 'vue-router'
 </script>
 
-
-<style scoped>
-.home {
-  text-align: center;
-  padding: 20px;
-}
-
-.tools-list {
+<style>
+nav {
   display: flex;
-  justify-content: space-around;
-  margin-top: 30px;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: #42b983;
+  flex-wrap: wrap;
 }
-
-.tool-card {
-  width: 45%;
-  padding: 20px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+a {
+  color: white;
+  text-decoration: none;
 }
-
-h1 {
-  font-size: 2.5rem;
-  color: #333;
-}
-
-h2 {
-  color: #42b983;
+a.router-link-exact-active {
+  font-weight: bold;
 }
 </style>
