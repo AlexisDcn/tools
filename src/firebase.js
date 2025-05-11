@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-
+import { getFirestore } from 'firebase/firestore'
 // Your web app's Firebase configuration
 
 const firebaseConfig = {
@@ -18,10 +18,10 @@ const firebaseConfig = {
   appId: "1:653077360519:web:10d1c65b49d8f37ca5ed22"
 
 };
-
-
-// Initialiser Firebase
+// Initialisation de Firebase
 const app = initializeApp(firebaseConfig)
 
-// Exporter l'instance d'authentification
+// Création et export des services Firebase
 export const auth = getAuth(app)
+export const db = getFirestore(app)
+export default app

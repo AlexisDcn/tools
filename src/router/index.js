@@ -81,8 +81,6 @@ const routes = [
   }
 ]
 
-// Création du routeur avec le reste du code inchangé
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes

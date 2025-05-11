@@ -141,15 +141,17 @@ export default {
       }
     ])
     
-    const tools = [
-      { name: 'Dashboard', path: '/', icon: 'fas fa-home' },
-      { name: 'Liens', path: '/links', icon: 'fas fa-link' }, // Nouveau lien
-      { name: 'Markdown', path: '/markdown', icon: 'fas fa-file-alt' },
-      { name: 'QR Code', path: '/qrcode', icon: 'fas fa-qrcode' },
-      { name: 'Convertisseur', path: '/converter', icon: 'fas fa-exchange-alt' },
-      { name: 'Calculatrice', path: '/calculator', icon: 'fas fa-calculator' },
-      { name: 'Paramètres', path: '/settings', icon: 'fas fa-cogs' }
-    ]
+// Seule la partie script change, où on modifie la liste des outils :
+
+const tools = [
+  { name: 'Dashboard', path: '/', icon: 'fas fa-home' },
+  { name: 'Liens', path: '/links', icon: 'fas fa-link' }, // Nouveau lien
+  { name: 'Markdown', path: '/markdown', icon: 'fas fa-file-alt' },
+  { name: 'QR Code', path: '/qrcode', icon: 'fas fa-qrcode' },
+  { name: 'Convertisseur', path: '/converter', icon: 'fas fa-exchange-alt' },
+  { name: 'Calculatrice', path: '/calculator', icon: 'fas fa-calculator' },
+  { name: 'Paramètres', path: '/settings', icon: 'fas fa-cogs' }
+]
     
     const currentPageTitle = computed(() => {
       const currentTool = tools.find(tool => tool.path === route.path)
