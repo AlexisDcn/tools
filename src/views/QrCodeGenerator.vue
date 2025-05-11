@@ -1,293 +1,447 @@
 <template>
-  <div class="tool-container">
-    <div class="tool-header">
-      <h2>Générateur de QR Code</h2>
-      <p class="tool-description">
-        Créez facilement des QR codes personnalisés pour partager des liens, des coordonnées ou d'autres informations.
-      </p>
-    </div>
-
+  <div class="qr-code-container">
+    <h1>Générateur de QR Code</h1>
+    
     <div class="qr-form">
-      <InputField
-        v-model="text"
-        label="Texte ou URL"
-        placeholder="Entrez le texte ou l'URL à encoder"
-        clearable
-      />
-
-      <div class="options-grid">
-        <div class="option-group">
-          <label class="field-label">Couleur</label>
-          <div class="color-pickers">
-            <div class="color-picker">
-              <span>Fond:</span>
-              <input type="color" v-model="bgColor" />
-            </div>
-            <div class="color-picker">
-              <span>QR:</span>
-              <input type="color" v-model="fgColor" />
-            </div>
-          </div>
+      <div class="form-group">
+        <label for="qrInput">Texte ou URL</label>
+        <textarea 
+          id="qrInput"
+          v-model="text"
+          placeholder="Entrez le texte à convertir en QR Code"
+          @input="generateQRCode"
+          class="text-input"
+        ></textarea>
+      </div>
+      
+      <div class="form-group color-inputs">
+        <div>
+          <label for="fgColor">Couleur</label>
+          <input type="color" id="fgColor" v-model="fgColor" @change="generateQRCode">
         </div>
-
-        <div class="option-group">
-          <label class="field-label">Taille</label>
-          <div class="size-slider">
-            <input 
-              type="range" 
-              v-model="size" 
-              min="100" 
-              max="400" 
-              step="10"
-            />
-            <span>{{ size }}px</span>
-          </div>
-        </div>
-
-        <div class="option-group">
-          <label class="field-label">Style</label>
-          <select v-model="style">
-            <option value="squares">Carrés</option>
-            <option value="dots">Points</option>
-          </select>
-        </div>
-
-        <div class="option-group">
-          <label class="field-label">Qualité</label>
-          <select v-model="errorCorrectionLevel">
-            <option value="L">Basse (7%)</option>
-            <option value="M">Moyenne (15%)</option>
-            <option value="Q">Haute (25%)</option>
-            <option value="H">Maximale (30%)</option>
-          </select>
+        <div>
+          <label for="bgColor">Fond</label>
+          <input type="color" id="bgColor" v-model="bgColor" @change="generateQRCode">
         </div>
       </div>
-
-      <div class="tool-actions">
-        <Button @click="generateQRCode" :loading="isGenerating">Générer</Button>
-        <Button variant="secondary" @click="resetOptions">Réinitialiser</Button>
+      
+      <div class="form-group">
+        <label for="sizeRange">Taille: {{ size }}px</label>
+        <input 
+          type="range" 
+          id="sizeRange" 
+          v-model.number="size"
+          min="100" 
+          max="300" 
+          step="10"
+          @change="generateQRCode"
+        >
       </div>
-
-      <div v-if="qrCode" class="qr-result">
-        <img :src="qrCode" alt="QR Code généré" :width="size" :height="size" />
-        
-        <div class="result-actions">
-          <Button variant="primary" @click="downloadQR">
-            Télécharger
-          </Button>
-          <Button variant="secondary" @click="copyQRImage" :disabled="!canCopyImage">
-            {{ copied ? 'Copié !' : 'Copier' }}
-          </Button>
-        </div>
+    </div>
+    
+    <div class="qr-preview" :style="{ backgroundColor: bgColor }">
+      <canvas ref="qrCanvas"></canvas>
+      <div v-if="!text" class="empty-state">
+        <i class="fas fa-qrcode"></i>
+        <p>Entrez du texte pour générer un QR code</p>
       </div>
+    </div>
+    
+    <div class="qr-actions">
+      <button @click="downloadQRCode" class="btn download-btn" :disabled="!text">
+        <i class="fas fa-download"></i> Télécharger
+      </button>
+      <button @click="copyToClipboard" class="btn copy-btn" :disabled="!text">
+        <i class="fas fa-copy"></i> Copier
+      </button>
+      <button @click="shareQRCode" class="btn share-btn" :disabled="!text || !canShare">
+        <i class="fas fa-share-alt"></i> Partager
+      </button>
+    </div>
+    
+    <div v-if="showToast" class="toast" :class="toastType">
+      {{ toastMessage }}
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted } from 'vue'
+<script>
 import QRCode from 'qrcode'
-import { useLocalStorage } from '../composables/useLocalStorage'
-import { useClipboard } from '../composables/useClipboard'
-import Button from '../components/common/Button.vue'
-import InputField from '../components/common/InputField.vue'
+import { ref, onMounted } from 'vue'
 
-// État local avec persistance
-const { value: text } = useLocalStorage('qrcode-text', '')
-const { value: bgColor } = useLocalStorage('qrcode-bg-color', '#FFFFFF')
-const { value: fgColor } = useLocalStorage('qrcode-fg-color', '#000000')
-const { value: size } = useLocalStorage('qrcode-size', 200)
-const { value: style } = useLocalStorage('qrcode-style', 'squares')
-const { value: errorCorrectionLevel } = useLocalStorage('qrcode-error-level', 'M')
-
-const qrCode = ref(null)
-const isGenerating = ref(false)
-const canCopyImage = ref(false)
-
-// Utilisation du composable de presse-papiers
-const { copy, copied } = useClipboard()
-
-// Vérifier la prise en charge du presse-papiers avancé
-onMounted(() => {
-  canCopyImage.value = 'ClipboardItem' in window && 
-                       navigator.clipboard && 
-                       typeof navigator.clipboard.write === 'function'
-})
-
-// Options QR code
-const qrOptions = computed(() => {
-  return {
-    errorCorrectionLevel: errorCorrectionLevel.value,
-    margin: 4,
-    color: {
-      dark: fgColor.value,
-      light: bgColor.value
-    },
-    width: size.value,
-    type: 'image/png'
-  }
-})
-
-// Générer le QR code
-const generateQRCode = async () => {
-  if (!text.value) return
-  
-  isGenerating.value = true
-  
-  try {
-    // Déterminer la forme des points en fonction du style
-    let rendererOpts = {}
-    if (style.value === 'dots') {
-      rendererOpts = {
-        type: 'svg',
-        rendererOpts: {
-          quality: 1,
-          ...qrOptions.value,
-          shape: 'circle'
+export default {
+  name: 'QrCodeGenerator',
+  setup() {
+    const text = ref('')
+    const fgColor = ref('#000000')
+    const bgColor = ref('#FFFFFF')
+    const size = ref(200)
+    const qrCanvas = ref(null)
+    const showToast = ref(false)
+    const toastMessage = ref('')
+    const toastType = ref('success')
+    const canShare = ref(false)
+    
+    const showToastNotification = (message, type = 'success') => {
+      toastMessage.value = message
+      toastType.value = type
+      showToast.value = true
+      
+      setTimeout(() => {
+        showToast.value = false
+      }, 3000)
+    }
+    
+    const generateQRCode = () => {
+      if (!text.value) return
+      
+      const canvas = qrCanvas.value
+      const options = {
+        width: size.value,
+        margin: 1,
+        color: {
+          dark: fgColor.value,
+          light: bgColor.value
         }
+      }
+      
+      QRCode.toCanvas(canvas, text.value, options, (error) => {
+        if (error) {
+          console.error('Erreur lors de la génération du QR code:', error)
+          showToastNotification('Erreur lors de la génération du QR Code', 'error')
+        }
+      })
+      
+      // Sauvegarde des paramètres
+      localStorage.setItem('qrcode-text', text.value)
+      localStorage.setItem('qrcode-fg-color', fgColor.value)
+      localStorage.setItem('qrcode-bg-color', bgColor.value)
+      localStorage.setItem('qrcode-size', size.value)
+    }
+    
+    const downloadQRCode = () => {
+      if (!text.value) return
+      
+      try {
+        const canvas = qrCanvas.value
+        const link = document.createElement('a')
+        
+        // Créer un nom de fichier basé sur le contenu
+        let filename = 'qrcode'
+        if (text.value.length <= 20) {
+          filename = `qrcode-${text.value.replace(/[^a-z0-9]/gi, '-')}`
+        } else {
+          filename = `qrcode-${new Date().getTime()}`
+        }
+        
+        link.download = `${filename}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+        
+        showToastNotification('QR Code téléchargé avec succès')
+      } catch (error) {
+        console.error('Erreur lors du téléchargement:', error)
+        showToastNotification('Erreur lors du téléchargement', 'error')
       }
     }
     
-    qrCode.value = await QRCode.toDataURL(text.value, {
-      ...qrOptions.value,
-      ...rendererOpts
+    const copyToClipboard = async () => {
+      if (!text.value) return
+      
+      try {
+        const canvas = qrCanvas.value
+        canvas.toBlob(async (blob) => {
+          try {
+            if (navigator.clipboard && navigator.clipboard.write) {
+              const clipboardItem = new ClipboardItem({ 'image/png': blob })
+              await navigator.clipboard.write([clipboardItem])
+              showToastNotification('QR Code copié dans le presse-papier')
+            } else {
+              // Fallback pour navigateurs plus anciens
+              const dataURL = canvas.toDataURL('image/png')
+              
+              // Créer un élément textuel pour copier le lien data URL
+              const textArea = document.createElement('textarea')
+              textArea.value = dataURL
+              document.body.appendChild(textArea)
+              textArea.select()
+              document.execCommand('copy')
+              document.body.removeChild(textArea)
+              
+              showToastNotification('Lien du QR Code copié dans le presse-papier')
+            }
+          } catch (err) {
+            console.error('Erreur lors de la copie:', err)
+            showToastNotification('Impossible de copier le QR Code', 'error')
+          }
+        })
+      } catch (err) {
+        console.error('Erreur lors de la création du blob:', err)
+        showToastNotification('Impossible de copier le QR Code', 'error')
+      }
+    }
+    
+    const shareQRCode = async () => {
+      if (!text.value || !canShare.value) return
+      
+      try {
+        const canvas = qrCanvas.value
+        canvas.toBlob(async (blob) => {
+          try {
+            const file = new File([blob], 'qrcode.png', { type: 'image/png' })
+            const shareData = {
+              title: 'Partager QR Code',
+              text: `QR Code pour: ${text.value.substring(0, 50)}${text.value.length > 50 ? '...' : ''}`,
+              files: [file]
+            }
+            
+            if (navigator.canShare && navigator.canShare(shareData)) {
+              await navigator.share(shareData)
+              showToastNotification('QR Code partagé avec succès')
+            } else {
+              // Fallback si Web Share API ne supporte pas les fichiers
+              await navigator.share({
+                title: 'Partager QR Code',
+                text: `Voici mon QR Code pour: ${text.value.substring(0, 50)}${text.value.length > 50 ? '...' : ''}`
+              })
+              showToastNotification('Lien de partage envoyé')
+            }
+          } catch (err) {
+            if (err.name !== 'AbortError') {  // Ignorer si l'utilisateur annule le partage
+              console.error('Erreur lors du partage:', err)
+              showToastNotification('Impossible de partager le QR Code', 'error')
+            }
+          }
+        })
+      } catch (err) {
+        console.error('Erreur lors de la création du blob:', err)
+        showToastNotification('Impossible de partager le QR Code', 'error')
+      }
+    }
+    
+    onMounted(() => {
+      // Charger les paramètres sauvegardés
+      text.value = localStorage.getItem('qrcode-text') || ''
+      fgColor.value = localStorage.getItem('qrcode-fg-color') || '#000000'
+      bgColor.value = localStorage.getItem('qrcode-bg-color') || '#FFFFFF'
+      size.value = parseInt(localStorage.getItem('qrcode-size')) || 200
+      
+      // Vérifier si le navigateur supporte l'API Web Share
+      canShare.value = !!navigator.share
+      
+      // Générer le QR code si du texte est déjà présent
+      if (text.value) {
+        setTimeout(() => {
+          generateQRCode()
+        }, 100)
+      }
     })
-  } catch (error) {
-    console.error('Erreur lors de la génération du QR code:', error)
-    alert('Erreur lors de la génération du QR code. Veuillez réessayer.')
-  } finally {
-    isGenerating.value = false
-  }
-}
-
-// Télécharger le QR code
-const downloadQR = () => {
-  if (!qrCode.value) return
-  
-  const link = document.createElement('a')
-  const filename = `qrcode-${Date.now()}.png`
-  
-  link.href = qrCode.value
-  link.download = filename
-  link.click()
-}
-
-// Copier le QR code dans le presse-papiers
-const copyQRImage = async () => {
-  if (!qrCode.value || !canCopyImage.value) return
-  
-  try {
-    // Convertir la base64 en blob
-    const response = await fetch(qrCode.value)
-    const blob = await response.blob()
     
-    // Copier l'image dans le presse-papiers
-    await navigator.clipboard.write([
-      new ClipboardItem({ [blob.type]: blob })
-    ])
-    
-    copied.value = true
-    setTimeout(() => (copied.value = false), 2000)
-  } catch (error) {
-    console.error('Erreur lors de la copie du QR code:', error)
-    alert('Impossible de copier l'image. Veuillez télécharger le QR code.')
+    return {
+      text,
+      fgColor,
+      bgColor,
+      size,
+      qrCanvas,
+      showToast,
+      toastMessage,
+      toastType,
+      canShare,
+      generateQRCode,
+      downloadQRCode,
+      copyToClipboard,
+      shareQRCode
+    }
   }
 }
-
-// Réinitialiser les options
-const resetOptions = () => {
-  text.value = ''
-  bgColor.value = '#FFFFFF'
-  fgColor.value = '#000000'
-  size.value = 200
-  style.value = 'squares'
-  errorCorrectionLevel.value = 'M'
-  qrCode.value = null
-}
-
-// Générer automatiquement si du texte est déjà présent
-onMounted(() => {
-  if (text.value) {
-    generateQRCode()
-  }
-})
 </script>
 
 <style scoped>
-.qr-form {
-  max-width: 700px;
+.qr-code-container {
+  max-width: 800px;
   margin: 0 auto;
+  padding: 20px;
+  position: relative;
 }
 
-.options-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin: 1.5rem 0;
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: var(--primary-color);
 }
 
-.option-group {
-  margin-bottom: 1rem;
+.qr-form {
+  margin-bottom: 30px;
 }
 
-.color-pickers {
+.form-group {
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--light-text);
+}
+
+.dark-mode label {
+  color: var(--dark-text);
+}
+
+.text-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--light-border);
+  border-radius: 4px;
+  min-height: 100px;
+  font-family: inherit;
+  resize: vertical;
+  background-color: var(--light-surface);
+  color: var(--light-text);
+}
+
+.dark-mode .text-input {
+  background-color: var(--dark-surface);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+
+.color-inputs {
   display: flex;
-  gap: 1rem;
+  gap: 20px;
 }
 
-.color-picker {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.color-picker input[type="color"] {
-  width: 2.5rem;
-  height: 2.5rem;
-  border: none;
-  border-radius: var(--border-radius-sm);
-  cursor: pointer;
-}
-
-.size-slider {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.size-slider input[type="range"] {
+.color-inputs > div {
   flex: 1;
 }
 
-select {
+input[type="color"] {
   width: 100%;
-  padding: 0.5rem;
-  border-radius: var(--border-radius-md);
-  border: var(--border-width) solid var(--bg-tertiary);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  height: 40px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.qr-result {
-  margin-top: 2rem;
+.qr-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+  margin-bottom: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  min-height: 300px;
+}
+
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background-color: white;
-  padding: 1.5rem;
-  border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-md);
+  color: #94a3b8;
+  text-align: center;
 }
 
-.result-actions {
+.empty-state i {
+  font-size: 50px;
+  margin-bottom: 10px;
+}
+
+.qr-actions {
   display: flex;
-  gap: 1rem;
-  margin-top: 1.5rem;
+  gap: 10px;
+}
+
+.btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+  color: white;
+}
+
+.download-btn {
+  background-color: var(--primary-color);
+}
+
+.download-btn:hover:not(:disabled) {
+  background-color: var(--secondary-color);
+  transform: translateY(-2px);
+}
+
+.copy-btn {
+  background-color: #4b5563;
+}
+
+.copy-btn:hover:not(:disabled) {
+  background-color: #374151;
+  transform: translateY(-2px);
+}
+
+.share-btn {
+  background-color: #10b981;
+}
+
+.share-btn:hover:not(:disabled) {
+  background-color: #059669;
+  transform: translateY(-2px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border-radius: 9999px;
+  color: white;
+  font-weight: 500;
+  z-index: 1000;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  animation: fadeInOut 3s forwards;
+}
+
+.toast.success {
+  background-color: var(--success-color);
+}
+
+.toast.error {
+  background-color: var(--danger-color);
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translate(-50%, 20px); }
+  15% { opacity: 1; transform: translate(-50%, 0); }
+  85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -20px); }
 }
 
 @media (max-width: 768px) {
-  .options-grid {
-    grid-template-columns: 1fr;
+  .qr-actions {
+    flex-direction: column;
   }
+  
+  .color-inputs {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+.dark-mode .qr-preview {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 </style>

@@ -1,86 +1,121 @@
-// router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
+import { auth } from '../firebase'
+import store from '../store'
+
+// Importer les vues
+import Dashboard from '@/views/Dashboard.vue'
+import MarkdownPreviewer from '@/views/MarkdownPreviewer.vue'
+import QrCodeGenerator from '@/views/QrCodeGenerator.vue'
+import Converter from '@/views/Converter.vue'
+import Calculator from '@/views/Calculator.vue'
+import Settings from '@/views/Settings.vue'
+import LinkBoard from '@/views/LinkBoard.vue'  // Nouvelle importation
+import NotFound from '@/views/NotFound.vue'
+import Login from '@/views/Login.vue'
+import Register from '@/views/Register.vue'
 
 const routes = [
-  { 
-    path: '/', 
-    name: 'Accueil', 
-    component: Home,
-    meta: {
-      title: 'Accueil'
-    }
+  // Routes publiques
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+    meta: { requiresGuest: true }
   },
-  { 
-    path: '/qr-code', 
-    name: 'QR Code', 
-    component: () => import('../views/QrCodeGenerator.vue'),
-    meta: {
-      title: 'Générateur de QR Code'
-    }
+  {
+    path: '/register',
+    name: 'Register',
+    component: Register,
+    meta: { requiresGuest: true }
   },
-  { 
-    path: '/json-formatter', 
-    name: 'JSON', 
-    component: () => import('../views/JsonFormatter.vue'),
-    meta: {
-      title: 'Formateur JSON'
-    }
+  
+  // Routes protégées
+  {
+    path: '/',
+    name: 'Dashboard',
+    component: Dashboard,
+    meta: { requiresAuth: true }
   },
-  { 
-    path: '/text-case', 
-    name: 'Texte', 
-    component: () => import('../views/TextCaseConverter.vue'),
-    meta: {
-      title: 'Convertisseur de casse'
-    }
+  {
+    path: '/markdown',
+    name: 'MarkdownPreviewer',
+    component: MarkdownPreviewer,
+    meta: { requiresAuth: true }
   },
-  { 
-    path: '/markdown', 
-    name: 'Markdown', 
-    component: () => import('../views/MarkdownPreviewer.vue'),
-    meta: {
-      title: 'Prévisualiseur Markdown'
-    }
+  {
+    path: '/qrcode',
+    name: 'QrCodeGenerator',
+    component: QrCodeGenerator,
+    meta: { requiresAuth: true }
   },
-  { 
-    path: '/image-base64', 
-    name: 'Image', 
-    component: () => import('../views/ImageToBase64.vue'),
-    meta: {
-      title: 'Image en Base64'
-    }
+  {
+    path: '/converter',
+    name: 'Converter',
+    component: Converter,
+    meta: { requiresAuth: true }
   },
-  // Route pour les pages non trouvées
-  { 
-    path: '/:pathMatch(.*)*', 
+  {
+    path: '/calculator',
+    name: 'Calculator',
+    component: Calculator,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/links',  // Nouvelle route
+    name: 'LinkBoard',
+    component: LinkBoard,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
+    meta: { requiresAuth: true }
+  },
+  
+  // Route 404
+  {
+    path: '/:pathMatch(.*)*',
     name: 'NotFound',
-    component: () => import('../views/NotFound.vue'),
-    meta: {
-      title: 'Page non trouvée',
-      hideInNav: true
-    }
+    component: NotFound
   }
 ]
 
+// Création du routeur avec le reste du code inchangé
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes,
-  scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) {
-      return savedPosition
-    } else {
-      return { top: 0 }
-    }
-  }
+  routes
 })
 
-// Mise à jour du titre de la page
+// Navigation guard
 router.beforeEach((to, from, next) => {
-  document.title = to.meta.title 
-    ? `${to.meta.title} | Boîte à Outils` 
-    : 'Boîte à Outils'
-  next()
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const requiresGuest = to.matched.some(record => record.meta.requiresGuest)
+  const isLoggedIn = store.getters.isLoggedIn
+
+  // Attendre que l'état d'authentification soit prêt
+  if (!store.state.authIsReady) {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      store.commit('setUser', user)
+      store.commit('setAuthIsReady', true)
+      unsubscribe()
+      
+      checkAuth()
+    })
+  } else {
+    checkAuth()
+  }
+
+  function checkAuth() {
+    if (requiresAuth && !isLoggedIn) {
+      next('/login')
+    } else if (requiresGuest && isLoggedIn) {
+      next('/')
+    } else {
+      next()
+    }
+  }
 })
 
 export default router
